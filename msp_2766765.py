@@ -1,66 +1,70 @@
-import sys  # For command line argument parsing
-import re   # For input file parsing
-
 # @ Name : Lane Gramling
-# @ Due Date : April 14, 2019
+# @ Due Date : April 15, 2019
 # @ Brief: Generates a Minimum Spanning Tree for a given weighted graph, using
-#           Kruskal's Algorithm.
+#           Kruskal's Algorithm. Uses path compression & union-by-rank in union operation.
 #  		Usage: python msp_2766765.py input.txt > output.txt
 
-graph = {}      # Contains Graph structure
-component = []  # Contains set names (array implementation for Union-Find [pg. 152])
+import sys # Used for getting command-line arguments
+import re  # Used for parsing inputs with regexes
 
-# Read in weighted graph
-def generateGraph(filename):
-    matrix = [weight_list.split(' ') for weight_list in open(filename, 'r').read().split('\n')] # Read & structure input
-    for row in matrix: row.remove('')                                                           # Clean input
-    matrix = [list(map(int, x)) for x in matrix]                                                # Format input
-    component = [s for s in range(len(matrix))]                                                 # Populate Component array
-    for v_i, weight_list in enumerate(matrix):                                                  # Generate graph vertices
-        if weight_list:                                                                         # ...
-            graph[v_i] = {}                                                                     # ...
-            for v_j, weight in enumerate(weight_list): graph[v_i][v_j] = weight                 # ... Assign weights to vertices
-        else: matrix.pop(v_i)                                                                   # (Final input cleaning)
+class Kruskal:
+    def __init__(self, filename):
+        self.graph = []         # Graph Structure
+        self.VERTEX_COUNT = 0   # VERTEX_COUNT
+        self.MST = []           # Store computed MST
+        g = {}                  # Temporarily used in building the graph structure
 
-# Find operation of Union-Find structure
-def FIND_SET(u):
-    if component[u] != u:
-        component[u] = FIND_SET(component[u])
-    return component[u]
+        matrix = [weight_list.split(' ') for weight_list in open(filename, 'r').read().split('\n')] # Read & structure input
+        for row in matrix: row.remove('')                                                           # Clean input
+        matrix = [list(map(int, x)) for x in matrix]                                                # Format input
+        for v_i, weight_list in enumerate(matrix):                                                  # Generate temporary 2D graph structure
+            if weight_list:                                                                         # ...
+                g[v_i] = {}                                                                         # ...
+                for v_j, weight in enumerate(weight_list): g[v_i][v_j] = weight                     # ... Assign weights to vertices
+            else: matrix.pop(v_i)                                                                   # (Final input cleaning)
+        for u in range(len(g)):                                                                     # Build graph structure
+            for v in range(len(g)):                                                                 # ...
+                if g[u][v]: self.graph.append([u,v,g[u][v]])                                        # ...
+        self.VERTEX_COUNT = len(matrix)                                                             # Update vertex count
 
-# Union definition
-def union(A, B):
-    pass # DEBUG
+    def FIND_SET(self, component, vertex): # Find operation with path compression
+        if component[vertex] != vertex: return self.FIND_SET(component, component[vertex])
+        return vertex
 
-# Perform Kruskal's Algorithm to compute MST
-def kruskal(graph):
-    VERTEX_COUNT = range(len(graph))                                 # (Number of Vertices)
-    MST = set()                                                      # Stores resulting MST
-    edges = set()                                                    # Stores Edge set
+    def union(self, component, rank, u, v):   # Union operation using union-by-rank implementation
+        u_root = self.FIND_SET(component, u)
+        v_root = self.FIND_SET(component, v)
+        if rank[u_root] < rank[v_root]: component[u_root] = v_root      # Determine who becomes the subtree
+        elif rank[u_root] > rank[v_root]: component[v_root] = u_root
+        else:
+            component[v_root] = u_root
+            rank[u_root] += 1           # Increment rank for node as necessary
 
-    for u in VERTEX_COUNT:
-        for v in VERTEX_COUNT:                                       # Build edge set from graph
-            if graph[u][v] != 0 and (u, v) not in edges:                 # Generate edges list
-                edges.add((u, v))
-    edges = sorted(edges, key=lambda edge: graph[edge[0]][edge[1]])      # Sort edges (by weight)
-    for edge in edges:                                               # Perform Union-Find operations in MST generation
-        u, v = edge
-        if FIND_SET(u) != FIND_SET(v):                               # Determine whether connected
-            MST.add((u, v))                                             # Append edge to resulting MST set
-            union(u, v)                                                 # Perform Union operation on (u, v) edge pairing
+    def computeMST(self):
+        component = []  # Tracks parents using component array implementation described on pg. 152
+        rank = []       # Tracks ranks for union-by-rank operation
+        i_edge = 0      # Tracks current edge index
 
+        self.graph = sorted(self.graph, key=lambda edge: edge[2]) # Sort by weight
+        for node in range(self.VERTEX_COUNT):                     # MAKE_SET(v)
+            component.append(node)
+            rank.append(0)
 
-
-
-
-
-
-
-
+        i = 0
+        while i_edge < self.VERTEX_COUNT - 1:                     # MST computation
+            u, v, weight = self.graph[i]
+            i = i + 1
+            u_root = self.FIND_SET(component, u)                  # Determine connectedness
+            v_root = self.FIND_SET(component, v)
+            if u_root != v_root:
+                i_edge = i_edge + 1
+                self.MST.append([u, v, weight])                   # A U {(u, v)}
+                self.union(component, rank, u, v)
 
 # Execution on runtime
 if len(sys.argv) < 2:
     print("[Usage]: python msp_2766765.py <input-file> > <output-file>")
 else:
-    generateGraph(sys.argv[1])                # Generate graph structure
-    MST = kruskal(graph)                           # Compute MST
+    k = Kruskal(sys.argv[1])
+    k.computeMST()
+    for edge in k.MST: print("{} {}".format(edge[0], edge[1]))
